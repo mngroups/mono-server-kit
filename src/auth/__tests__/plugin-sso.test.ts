@@ -109,6 +109,29 @@ describe("auth plugin — sso mode", () => {
     await google.close();
   });
 
+  it("adds the org hint to the authorize URL, alongside an IdP hint", async () => {
+    const hinted = await buildApp(issuer.issuer(), {
+      mode: "sso",
+      redirectUris: [REDIRECT],
+      orgHint: "pt-maju",
+      idpHint: "google",
+    });
+    const res = await hinted.inject({
+      url: `/v1/auth/authorize-url?redirect_uri=${encodeURIComponent(REDIRECT)}`,
+    });
+    const params = new URL(res.json().data.url).searchParams;
+    expect(params.get("org_hint")).toBe("pt-maju");
+    expect(params.get("kc_idp_hint")).toBe("google");
+    await hinted.close();
+  });
+
+  it("sends no org hint when none is configured", async () => {
+    const res = await app.inject({
+      url: `/v1/auth/authorize-url?redirect_uri=${encodeURIComponent(REDIRECT)}`,
+    });
+    expect(new URL(res.json().data.url).searchParams.has("org_hint")).toBe(false);
+  });
+
   it("logout returns the end-session URL for global logout", async () => {
     const res = await app.inject({ method: "POST", url: "/v1/auth/logout" });
     expect(res.statusCode).toBe(200);

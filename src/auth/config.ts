@@ -13,6 +13,11 @@ export type AuthOptions = {
   idpHint?: string;
   /** Query parameter carrying `idpHint`. Default `kc_idp_hint`. */
   idpHintParam?: string;
+  /**
+   * sso only: the client org (id or slug) this deployment serves, sent as `org_hint`. The
+   * provider brands its login page with that org and signs the user straight into it.
+   */
+  orgHint?: string;
   /** sso only: the FE callback URLs allowed as `redirect_uri`. */
   redirectUris?: string[];
   /** sso only: where the central end-session page sends the user afterwards. */
@@ -33,6 +38,7 @@ export function validateAuthOptions(o: AuthOptions): void {
   if (!URL.canParse(o.issuer)) throw new Error("auth: issuer must be an absolute URL");
   if (!o.clientSecret) throw new Error("auth: clientSecret is required");
   if (o.idpHint && o.mode !== "sso") throw new Error('auth: idpHint requires mode "sso"');
+  if (o.orgHint && o.mode !== "sso") throw new Error('auth: orgHint requires mode "sso"');
   if (o.mode === "sso" && !o.redirectUris?.length) {
     throw new Error('auth: mode "sso" requires at least one redirectUris entry');
   }

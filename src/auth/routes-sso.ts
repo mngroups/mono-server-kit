@@ -43,6 +43,7 @@ export function registerSsoRoutes(app: FastifyInstance, oidc: OidcClient, opts: 
         state,
         idpHint: opts.idpHint,
         idpHintParam: opts.idpHintParam,
+        orgHint: opts.orgHint,
       });
       reply.ok({ url, state, code_verifier: verifier });
     }
