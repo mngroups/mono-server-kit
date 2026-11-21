@@ -104,4 +104,16 @@ describe("createVerifier", () => {
     });
     expect((await strict(await issuer.signTestToken({ sub: "d", aud: "app-a" }))).id).toBe("d");
   });
+
+  it("answers 503, not 401, when the JWKS cannot be fetched", async () => {
+    const unreachable = createVerifier({
+      jwksUri: "http://127.0.0.1:1/jwks",
+      issuer: issuer.issuer(),
+      audience: "app-a",
+    });
+    const error = await unreachable(await issuer.signTestToken({ sub: "u", aud: "app-a" })).catch(
+      (e: unknown) => e
+    );
+    expect(error).toMatchObject({ code: 503, message: MESSAGES.authUnavailable });
+  });
 });
