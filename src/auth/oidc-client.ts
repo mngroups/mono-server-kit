@@ -22,6 +22,13 @@ const discoverySchema = z.object({
 
 export type Discovery = z.infer<typeof discoverySchema>;
 
+/** monexa-auth's org-switch grant type. */
+export const ORG_SWITCH_GRANT = "urn:monexa:params:oauth:grant-type:org-switch";
+
+const orgsResponseSchema = z.object({
+  data: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+
 const tokenResponseSchema = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().min(1),
@@ -35,6 +42,8 @@ export type OidcClientOptions = {
   clientSecret: string;
   /** Per call to the central service. Default 10s. */
   timeoutMs?: number;
+  /** Provider orgs endpoint. Default `<issuer origin>/api/me/orgs`. */
+  orgsEndpoint?: string;
   /** Used when the provider omits `refresh_expires_in`. Default 86400 (1 day). */
   refreshExpiresInFallback?: number;
 };
@@ -45,6 +54,10 @@ export interface OidcClient {
   passwordGrant(username: string, password: string, orgId?: string): Promise<TokenSet>;
   codeGrant(code: string, codeVerifier: string, redirectUri: string): Promise<TokenSet>;
   refreshGrant(refreshToken: string): Promise<TokenSet>;
+  /** monexa-auth's org switch: new tokens for `orgId`, the old refresh token is spent. */
+  orgSwitchGrant(refreshToken: string, orgId: string): Promise<TokenSet>;
+  /** The caller's orgs from the provider's orgs endpoint. */
+  listOrgs(accessToken: string): Promise<{ id: string; name: string }[]>;
   revoke(refreshToken: string): Promise<void>;
   authorizeUrl(p: {
     redirectUri: string;
@@ -152,6 +165,20 @@ export function createOidcClient(opts: OidcClientOptions): OidcClient {
       ),
     refreshGrant: (refreshToken) =>
       grant({ grant_type: "refresh_token", refresh_token: refreshToken }, MESSAGES.invalidToken),
+    orgSwitchGrant: (refreshToken, orgId) =>
+      grant(
+        { grant_type: ORG_SWITCH_GRANT, refresh_token: refreshToken, org_id: orgId },
+        MESSAGES.invalidToken
+      ),
+
+    async listOrgs(accessToken) {
+      const endpoint = opts.orgsEndpoint ?? new URL("/api/me/orgs", opts.issuer).toString();
+      const res = await call(endpoint, { headers: { authorization: `Bearer ${accessToken}` } });
+      if (res.status === 401) throw new AppError(401, MESSAGES.invalidToken);
+      const parsed = orgsResponseSchema.safeParse(await res.json().catch(() => null));
+      if (!res.ok || !parsed.success) throw unavailable(new Error(`orgs endpoint ${res.status}`));
+      return parsed.data.data;
+    },
 
     async revoke(refreshToken) {
       try {

@@ -10,6 +10,7 @@ import {
   jwtVerify,
   SignJWT,
 } from "jose";
+import { ORG_SWITCH_GRANT } from "../auth/oidc-client.js";
 
 export type DevUser = {
   username: string;
@@ -30,8 +31,7 @@ export type DevUser = {
 
 export type DevOrg = { id: string; name: string; permissions?: Record<string, string[]> };
 
-/** Grant type of monexa-auth's org switch (params `refresh_token`, `org_id`). */
-export const ORG_SWITCH_GRANT = "urn:monexa:params:oauth:grant-type:org-switch";
+export { ORG_SWITCH_GRANT } from "../auth/oidc-client.js";
 
 export type DevClient = { clientId: string; clientSecret: string; redirectUris: string[] };
 

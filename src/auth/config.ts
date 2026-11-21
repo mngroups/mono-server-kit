@@ -19,6 +19,8 @@ export type AuthOptions = {
   postLogoutRedirectUri?: string;
   /** Per call to the central service. Default 10s. */
   timeoutMs?: number;
+  /** Provider orgs endpoint for `GET /v1/auth/orgs`. Default `<issuer origin>/api/me/orgs`. */
+  orgsEndpoint?: string;
   /** See `createVerifier`. Default 30s. */
   jwksCooldownMs?: number;
 };
