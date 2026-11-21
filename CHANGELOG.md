@@ -1,5 +1,12 @@
 
 
+## [0.3.1](///compare/v0.3.0...v0.3.1) (2026-11-21)
+
+
+### Added
+
+* return the active org from auth check ([#4](undefined/undefined/undefined/issues/4)) edb1929
+
 ## [0.3.0](///compare/v0.2.0...v0.3.0) (2026-11-21)
 
 
