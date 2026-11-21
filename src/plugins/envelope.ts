@@ -5,9 +5,9 @@ import fp from "fastify-plugin";
 declare module "fastify" {
   interface FastifyReply {
     /** Sends `{ success: true, message, code, data, request_id, timestamp }`. */
-    ok<T>(data: T, opts?: { message?: string; code?: number }): FastifyReply;
+    ok<T>(data: T, opts?: { message?: string; code?: number }): this;
     /** Sends `{ success: false, message, code, data: null, request_id, timestamp }`. */
-    fail(code: number, message: string): FastifyReply;
+    fail(code: number, message: string): this;
   }
 }
 
