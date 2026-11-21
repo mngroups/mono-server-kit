@@ -263,6 +263,31 @@ describe("createOidcClient", () => {
     await app.close();
   });
 
+  describe("org_id on the password grant", () => {
+    async function recordingProvider() {
+      const bodies: URLSearchParams[] = [];
+      const provider = await fakeProvider((reply) => {
+        bodies.push(new URLSearchParams(reply.request.body as string));
+        return { access_token: "a", refresh_token: "r", expires_in: 60 };
+      });
+      return { ...provider, bodies };
+    }
+
+    it("sends org_id when given, as is", async () => {
+      const { app, base, bodies } = await recordingProvider();
+      await client({ issuer: base }).passwordGrant("u", "p", "not-a-uuid");
+      expect(bodies[0]?.get("org_id")).toBe("not-a-uuid");
+      await app.close();
+    });
+
+    it("omits org_id when not given", async () => {
+      const { app, base, bodies } = await recordingProvider();
+      await client({ issuer: base }).passwordGrant("u", "p");
+      expect(bodies[0]?.has("org_id")).toBe(false);
+      await app.close();
+    });
+  });
+
   describe("grant reasons", () => {
     const refuse = (description: string) =>
       fakeProvider((reply) =>

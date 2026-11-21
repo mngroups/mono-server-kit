@@ -46,6 +46,15 @@ describe("auth plugin — credentials mode", () => {
     expect(res.json()).toMatchObject({ success: false, message: MESSAGES.invalidCredentials });
   });
 
+  it("login with an empty org_id is 422", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/auth/login",
+      payload: { username: "admin", password: "admin123", org_id: "" },
+    });
+    expect(res.statusCode).toBe(422);
+  });
+
   it("login with an empty username is 422", async () => {
     expect((await login("   ", "x")).statusCode).toBe(422);
   });

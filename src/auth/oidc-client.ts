@@ -41,7 +41,8 @@ export type OidcClientOptions = {
 
 export interface OidcClient {
   discovery(): Promise<Discovery>;
-  passwordGrant(username: string, password: string): Promise<TokenSet>;
+  /** `orgId` asks the provider for that org; it decides eligibility. */
+  passwordGrant(username: string, password: string, orgId?: string): Promise<TokenSet>;
   codeGrant(code: string, codeVerifier: string, redirectUri: string): Promise<TokenSet>;
   refreshGrant(refreshToken: string): Promise<TokenSet>;
   revoke(refreshToken: string): Promise<void>;
@@ -128,9 +129,15 @@ export function createOidcClient(opts: OidcClientOptions): OidcClient {
 
   return {
     discovery,
-    passwordGrant: (username, password) =>
+    passwordGrant: (username, password, orgId) =>
       grant(
-        { grant_type: "password", username, password, scope: "openid" },
+        {
+          grant_type: "password",
+          username,
+          password,
+          scope: "openid",
+          ...(orgId !== undefined && { org_id: orgId }),
+        },
         MESSAGES.invalidCredentials
       ),
     codeGrant: (code, codeVerifier, redirectUri) =>
