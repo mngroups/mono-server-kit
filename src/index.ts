@@ -1,6 +1,7 @@
 export { type AuthMode, type AuthOptions, validateAuthOptions } from "./auth/config.js";
 export type { Discovery, OidcClient, TokenSet } from "./auth/oidc-client.js";
 export { auth } from "./auth/plugin.js";
+export { GRANT_REASONS, type GrantReason, reasonMessage } from "./auth/reasons.js";
 export type { AuthUser } from "./auth/types.js";
 export { defineEnv } from "./env.js";
 export { AppError } from "./errors.js";

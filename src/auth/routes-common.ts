@@ -29,6 +29,37 @@ export function registerCommonRoutes(
   );
 
   r.post(
+    "/v1/auth/switch-org",
+    {
+      config: { public: true },
+      schema: {
+        body: z.object({ refresh_token: z.string().min(1), org_id: z.string().min(1) }),
+        response: { 200: envelopeSchema(tokenSetSchema) },
+      },
+    },
+    async (request, reply) => {
+      const { refresh_token, org_id } = request.body;
+      reply.ok(await oidc.orgSwitchGrant(refresh_token, org_id));
+    }
+  );
+
+  r.get(
+    "/v1/auth/orgs",
+    {
+      schema: {
+        response: {
+          200: envelopeSchema(z.array(z.object({ id: z.string(), name: z.string() }))),
+        },
+      },
+    },
+    async (request, reply) => {
+      // The guard already verified this bearer token.
+      const token = (request.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      reply.ok(await oidc.listOrgs(token));
+    }
+  );
+
+  r.post(
     "/v1/auth/logout",
     {
       config: { public: true },

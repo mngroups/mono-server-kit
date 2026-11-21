@@ -39,6 +39,7 @@ export const auth = fp<AuthOptions>(
       clientId: opts.clientId,
       clientSecret: opts.clientSecret,
       timeoutMs: opts.timeoutMs,
+      orgsEndpoint: opts.orgsEndpoint,
     });
 
     // Resolved on first use, so boot never depends on the central service being up.

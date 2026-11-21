@@ -36,6 +36,19 @@ describe("errorHandler", () => {
     });
   });
 
+  it("sends an AppError's data in the envelope", async () => {
+    const app = await buildApp();
+    app.get("/x", () => {
+      throw new AppError(401, "Ditolak", { data: { reason: "no_app_access" } });
+    });
+    const res = await app.inject({ url: "/x" });
+    expect(res.json()).toMatchObject({
+      code: 401,
+      message: "Ditolak",
+      data: { reason: "no_app_access" },
+    });
+  });
+
   it("maps AppError to its own code and message", async () => {
     const app = await buildApp();
     app.get("/x", () => {

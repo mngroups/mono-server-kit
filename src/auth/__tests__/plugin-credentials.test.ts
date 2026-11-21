@@ -24,8 +24,8 @@ afterAll(async () => {
   await issuer.app.close();
 });
 
-const login = (username: string, password: string) =>
-  app.inject({ method: "POST", url: "/v1/auth/login", payload: { username, password } });
+const login = (username: string, password: string, extra: Record<string, string> = {}) =>
+  app.inject({ method: "POST", url: "/v1/auth/login", payload: { username, password, ...extra } });
 
 async function tokensFor(username: string, password: string) {
   return (await login(username, password)).json().data as z.infer<typeof feLoginData>;
@@ -44,6 +44,33 @@ describe("auth plugin — credentials mode", () => {
     const res = await login("admin", "nope");
     expect(res.statusCode).toBe(401);
     expect(res.json()).toMatchObject({ success: false, message: MESSAGES.invalidCredentials });
+  });
+
+  it("forwards org_id on login to the provider", async () => {
+    const res = await login("multi", "multi123", { org_id: "org-b" });
+    const check = await app.inject({
+      url: "/v1/auth/check",
+      headers: bearer(res.json().data.access_token),
+    });
+    expect(check.json().data).toEqual({ user_id: "user-4", permissions: ["b:view"] });
+  });
+
+  it("passes a refusal reason through as data.reason", async () => {
+    const res = await login("fresh", "fresh123");
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      message: MESSAGES.passwordChangeRequired,
+      data: { reason: "password_change_required" },
+    });
+  });
+
+  it("login with an empty org_id is 422", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/auth/login",
+      payload: { username: "admin", password: "admin123", org_id: "" },
+    });
+    expect(res.statusCode).toBe(422);
   });
 
   it("login with an empty username is 422", async () => {

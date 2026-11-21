@@ -12,12 +12,18 @@ export function registerCredentialsRoutes(app: FastifyInstance, oidc: OidcClient
     {
       config: { public: true },
       schema: {
-        body: z.object({ username: z.string().trim().min(1), password: z.string().min(1) }),
+        body: z.object({
+          username: z.string().trim().min(1),
+          password: z.string().min(1),
+          /** Optional: the org to sign in to (multi-org providers). */
+          org_id: z.string().min(1).optional(),
+        }),
         response: { 200: envelopeSchema(tokenSetSchema) },
       },
     },
     async (request, reply) => {
-      reply.ok(await oidc.passwordGrant(request.body.username, request.body.password));
+      const { username, password, org_id } = request.body;
+      reply.ok(await oidc.passwordGrant(username, password, org_id));
     }
   );
 }

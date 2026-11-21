@@ -4,5 +4,7 @@ export {
   type DevClient,
   type DevIssuer,
   type DevIssuerOptions,
+  type DevOrg,
   type DevUser,
+  ORG_SWITCH_GRANT,
 } from "./issuer.js";

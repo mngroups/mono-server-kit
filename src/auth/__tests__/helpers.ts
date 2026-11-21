@@ -22,6 +22,23 @@ export const USERS: DevUser[] = [
     permissions: { "app-a": ["other:view"] },
   },
   { username: "nobody", password: "nobody123", sub: "user-3", permissions: {} },
+  {
+    username: "multi",
+    password: "multi123",
+    sub: "user-4",
+    permissions: { "app-a": ["example:all"] },
+    orgs: [
+      { id: "org-a", name: "Org A" },
+      { id: "org-b", name: "Org B", permissions: { "app-a": ["b:view"] } },
+    ],
+  },
+  {
+    username: "fresh",
+    password: "fresh123",
+    sub: "user-5",
+    permissions: {},
+    mustChangePassword: true,
+  },
 ];
 
 export async function startIssuer(): Promise<DevIssuer> {

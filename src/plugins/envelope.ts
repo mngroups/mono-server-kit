@@ -6,8 +6,8 @@ declare module "fastify" {
   interface FastifyReply {
     /** Sends `{ success: true, message, code, data, request_id, timestamp }`. */
     ok<T>(data: T, opts?: { message?: string; code?: number }): this;
-    /** Sends `{ success: false, message, code, data: null, request_id, timestamp }`. */
-    fail(code: number, message: string): this;
+    /** Sends `{ success: false, message, code, data, request_id, timestamp }` (`data` defaults to null). */
+    fail(code: number, message: string, data?: unknown): this;
   }
 }
 
@@ -40,9 +40,12 @@ export const envelope = fp(
     >(this: FastifyReply, data: T, opts: { message?: string; code?: number } = {}) {
       return send(this, true, opts.code ?? 200, opts.message ?? "OK", data);
     });
-    app.decorateReply("fail", function (this: FastifyReply, code: number, message: string) {
-      return send(this, false, code, message, null);
-    });
+    app.decorateReply(
+      "fail",
+      function (this: FastifyReply, code: number, message: string, data?: unknown) {
+        return send(this, false, code, message, data ?? null);
+      }
+    );
   },
   { name: "@mono/envelope", fastify: "5.x" }
 );
