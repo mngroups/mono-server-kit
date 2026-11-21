@@ -52,7 +52,11 @@ describe("auth plugin — credentials mode", () => {
       url: "/v1/auth/check",
       headers: bearer(res.json().data.access_token),
     });
-    expect(check.json().data).toEqual({ user_id: "user-4", permissions: ["b:view"] });
+    expect(check.json().data).toEqual({
+      user_id: "user-4",
+      permissions: ["b:view"],
+      org: { id: "org-b", name: "Org B" },
+    });
   });
 
   it("passes a refusal reason through as data.reason", async () => {
@@ -122,13 +126,13 @@ describe("auth plugin — credentials mode", () => {
     const tokens = await tokensFor("admin", "admin123");
     const res = await app.inject({ url: "/v1/auth/check", headers: bearer(tokens.access_token) });
     expect(res.statusCode).toBe(200);
-    expect(res.json().data).toEqual({ user_id: "user-1", permissions: ["example:all"] });
+    expect(res.json().data).toEqual({ user_id: "user-1", permissions: ["example:all"], org: null });
   });
 
   it("/v1/auth/check returns [] for a user without permissions", async () => {
     const tokens = await tokensFor("nobody", "nobody123");
     const res = await app.inject({ url: "/v1/auth/check", headers: bearer(tokens.access_token) });
-    expect(res.json().data).toEqual({ user_id: "user-3", permissions: [] });
+    expect(res.json().data).toEqual({ user_id: "user-3", permissions: [], org: null });
   });
 
   it("guards every non-public route: no token or a bad token is 401", async () => {

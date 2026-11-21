@@ -62,7 +62,11 @@ describe("auth plugin — sso mode", () => {
       url: "/v1/auth/check",
       headers: { authorization: `Bearer ${tokens.access_token}` },
     });
-    expect(check.json().data).toEqual({ user_id: "user-1", permissions: ["example:all"] });
+    expect(check.json().data).toEqual({
+      user_id: "user-1",
+      permissions: ["example:all"],
+      org: null,
+    });
   });
 
   it("rejects a redirect_uri outside the allowlist on both routes with 422", async () => {

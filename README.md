@@ -112,16 +112,16 @@ The FE treats 401 as "refresh, then log out" and never logs a user out on a 5xx.
 
 Routes registered by mode:
 
-| Route                        | `credentials`                                              | `sso`                                                                   |
-| ---------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `POST /v1/auth/login`        | `{ username, password, org_id? }` → tokens                 | 404                                                                     |
-| `GET /v1/auth/authorize-url` | 404                                                        | `?redirect_uri` (must be allowlisted) → `{ url, state, code_verifier }` |
-| `POST /v1/auth/callback`     | 404                                                        | `{ code, code_verifier, redirect_uri }` → tokens                        |
-| `POST /v1/auth/refresh`      | `{ refresh_token }` → tokens                               | same                                                                    |
-| `POST /v1/auth/logout`       | optional `{ refresh_token }`, revoked best effort → `null` | same → `{ end_session_url }`                                            |
-| `GET /v1/auth/check`         | `{ user_id, permissions }` from the token                  | same                                                                    |
-| `POST /v1/auth/switch-org`   | `{ refresh_token, org_id }` → tokens for that org (public) | same                                                                    |
-| `GET /v1/auth/orgs`          | the caller's orgs `[{ id, name }]` (guarded)               | same                                                                    |
+| Route                        | `credentials`                                                                     | `sso`                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `POST /v1/auth/login`        | `{ username, password, org_id? }` → tokens                                        | 404                                                                     |
+| `GET /v1/auth/authorize-url` | 404                                                                               | `?redirect_uri` (must be allowlisted) → `{ url, state, code_verifier }` |
+| `POST /v1/auth/callback`     | 404                                                                               | `{ code, code_verifier, redirect_uri }` → tokens                        |
+| `POST /v1/auth/refresh`      | `{ refresh_token }` → tokens                                                      | same                                                                    |
+| `POST /v1/auth/logout`       | optional `{ refresh_token }`, revoked best effort → `null`                        | same → `{ end_session_url }`                                            |
+| `GET /v1/auth/check`         | `{ user_id, permissions, org }` from the token (`org` = `{ id, name }` or `null`) | same                                                                    |
+| `POST /v1/auth/switch-org`   | `{ refresh_token, org_id }` → tokens for that org (public)                        | same                                                                    |
+| `GET /v1/auth/orgs`          | the caller's orgs `[{ id, name }]` (guarded)                                      | same                                                                    |
 
 Tokens are returned as `{ access_token, refresh_token, expires_in, refresh_expires_in }`.
 

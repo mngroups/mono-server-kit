@@ -92,3 +92,18 @@ describe("GET /v1/auth/orgs", () => {
     await fake.close();
   });
 });
+
+describe("GET /v1/auth/check — active org", () => {
+  it("returns the token's org", async () => {
+    const { refresh_token } = await login();
+    const switched = (await switchOrg({ refresh_token, org_id: "org-b" })).json().data;
+    const res = await app.inject({ url: "/v1/auth/check", headers: bearer(switched.access_token) });
+    expect(res.json().data.org).toEqual({ id: "org-b", name: "Org B" });
+  });
+
+  it("returns null when the token has no org", async () => {
+    const { access_token } = await login("admin", "admin123");
+    const res = await app.inject({ url: "/v1/auth/check", headers: bearer(access_token) });
+    expect(res.json().data.org).toBeNull();
+  });
+});
