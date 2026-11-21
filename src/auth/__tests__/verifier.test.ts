@@ -76,6 +76,25 @@ describe("createVerifier", () => {
     await expectInvalid(verify(await issuer.signTestToken({ aud: "app-a" })));
   });
 
+  it("maps string org_id and org_name claims to orgId and orgName", async () => {
+    const user = await verify(
+      await issuer.signTestToken({ sub: "u", aud: "app-a", org_id: "org-1", org_name: "PT A" })
+    );
+    expect(user.orgId).toBe("org-1");
+    expect(user.orgName).toBe("PT A");
+  });
+
+  it("leaves orgId and orgName undefined when the claims are missing or not strings", async () => {
+    const none = await verify(await issuer.signTestToken({ sub: "u", aud: "app-a" }));
+    expect(none.orgId).toBeUndefined();
+    expect(none.orgName).toBeUndefined();
+    const bad = await verify(
+      await issuer.signTestToken({ sub: "u", aud: "app-a", org_id: 7, org_name: ["x"] })
+    );
+    expect(bad.orgId).toBeUndefined();
+    expect(bad.orgName).toBeUndefined();
+  });
+
   it("treats a missing or non-array permissions claim as no permissions", async () => {
     const none = await verify(await issuer.signTestToken({ sub: "u", aud: "app-a" }));
     expect(none.permissions.size).toBe(0);

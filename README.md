@@ -106,7 +106,7 @@ The FE treats 401 as "refresh, then log out" and never logs a user out on a 5xx.
 
 **Secure by default.** Once `auth` is registered, every route requires `Authorization: Bearer <token>` unless it sets `config: { public: true }`. Tokens are verified locally against the issuer's JWKS, which is cached, refetched when an unknown `kid` appears, and checked with 30 s of clock tolerance. There is no network call per request. A token whose `azp` is another client is rejected even when `aud` also lists this app, because its `permissions` belong to that client.
 
-- `request.user`: `{ id, permissions: ReadonlySet<string>, claims }`, taken from `sub` and the `permissions` claim. If the claim is missing, the user has no permissions.
+- `request.user`: `{ id, permissions: ReadonlySet<string>, claims, orgId?, orgName? }`, taken from `sub`, the `permissions` claim and the string claims `org_id` / `org_name`. If the permissions claim is missing, the user has no permissions. `orgId` / `orgName` are `undefined` when the claim is missing or not a string.
 - `app.requirePermission("example.item:view", …)` is a preHandler with OR semantics. A granted `example:all` covers every `example.*` permission.
 
 Routes registered by mode:
@@ -140,6 +140,17 @@ const target = await presigner.presign({ filename, contentType, size, maxBytes, 
 
 The signed policy pins the content type and the size range. A file that is too big or of a type not in `allowedTypes` gets a 422.
 
+Downloads and existence checks:
+
+```ts
+const dl = await presigner.presignDownload({ key, filename, expiresInSeconds });
+// → { url, expires_in }   (expiry defaults to the presigner's, 300 s)
+const head = await presigner.stat(key);
+// → { size, contentType }, or null when the object does not exist
+```
+
+`presignDownload` signs a GET with `Content-Disposition: attachment; filename="<filename>"`. Quotes, backslashes and control characters are stripped from the filename. `stat` rethrows any error other than not-found.
+
 ### Health and shutdown
 
 - `health` serves `GET /health` and `GET /ready`. `/ready` answers 503 and names the failing checks. Both routes are public.
@@ -158,6 +169,7 @@ const issuer = await createDevIssuer({
       password: "admin123",
       sub: "u1",
       permissions: { "my-app": ["example:all"] },
+      org: { id: "org-1", name: "PT A" }, // optional: adds org_id / org_name claims
     },
   ],
   clients: [
