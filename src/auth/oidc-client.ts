@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AppError } from "../errors.js";
 import { MESSAGES } from "../messages.js";
+import { isGrantReason, reasonMessage } from "./reasons.js";
 
 /** What login / refresh / callback return to the FE (the shape `@mono/auth` expects). */
 export type TokenSet = {
@@ -103,8 +104,15 @@ export function createOidcClient(opts: OidcClientOptions): OidcClient {
     });
     const body: unknown = await res.json().catch(() => null);
     if (!res.ok) {
-      const error = (body as { error?: string } | null)?.error;
-      if (error === "invalid_grant") throw new AppError(401, rejectedMessage);
+      const { error, error_description: reason } =
+        (body as { error?: string; error_description?: unknown } | null) ?? {};
+      if (error === "invalid_grant") {
+        // A known reason reaches the FE as data.reason; anything else keeps today's copy.
+        if (isGrantReason(reason)) {
+          throw new AppError(401, reasonMessage(reason), { data: { reason } });
+        }
+        throw new AppError(401, rejectedMessage);
+      }
       throw misconfigured(new Error(`token endpoint ${res.status}: ${error ?? "no error code"}`));
     }
     const parsed = tokenResponseSchema.safeParse(body);

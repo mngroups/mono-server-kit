@@ -39,7 +39,7 @@ export const errorHandler = fp(
       }
       if (error instanceof AppError) {
         if (error.code >= 500) request.log.error({ err: error.cause ?? error });
-        return reply.fail(error.code, error.message);
+        return reply.fail(error.code, error.message, error.data);
       }
       const status = error.statusCode ?? 500;
       if (!isResponseSerializationError(error) && status >= 400 && status < 500) {

@@ -262,4 +262,35 @@ describe("createOidcClient", () => {
     await expect(client({ issuer: base }).revoke("r")).resolves.toBeUndefined();
     await app.close();
   });
+
+  describe("grant reasons", () => {
+    const refuse = (description: string) =>
+      fakeProvider((reply) =>
+        reply.code(400).send({ error: "invalid_grant", error_description: description })
+      );
+
+    it.each([
+      ["invalid_credentials", MESSAGES.invalidCredentials],
+      ["no_app_access", MESSAGES.noAppAccess],
+      ["password_change_required", MESSAGES.passwordChangeRequired],
+      ["org_not_eligible", MESSAGES.orgNotEligible],
+      ["google_required", MESSAGES.googleRequired],
+    ])("passes %s through with its message and data.reason", async (reason, message) => {
+      const { app, base } = await refuse(reason);
+      const error = await caught(client({ issuer: base }).passwordGrant("a", "b"));
+      expect(error).toMatchObject({ code: 401, message, data: { reason } });
+      await app.close();
+    });
+
+    it("keeps today's message and no data for an unknown description", async () => {
+      const { app, base } = await refuse("grant request is invalid");
+      const login = await caught(client({ issuer: base }).passwordGrant("a", "b"));
+      expect(login).toMatchObject({ code: 401, message: MESSAGES.invalidCredentials });
+      expect(login.data).toBeUndefined();
+      const refresh = await caught(client({ issuer: base }).refreshGrant("r"));
+      expect(refresh).toMatchObject({ code: 401, message: MESSAGES.invalidToken });
+      expect(refresh.data).toBeUndefined();
+      await app.close();
+    });
+  });
 });
