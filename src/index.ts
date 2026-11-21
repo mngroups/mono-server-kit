@@ -1,3 +1,4 @@
+export { defineEnv } from "./env.js";
 export { AppError } from "./errors.js";
 export { MESSAGES } from "./messages.js";
 export { envelope, envelopeSchema } from "./plugins/envelope.js";
