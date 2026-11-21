@@ -47,7 +47,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
-    "@mono/auth": "link:../mono-auth",
+    "@mono/auth": "^0.2.0",
     "@release-it/conventional-changelog": "8.0.1",
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "^4.1.12",

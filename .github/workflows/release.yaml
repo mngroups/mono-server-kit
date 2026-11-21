@@ -33,6 +33,8 @@ jobs:
           {
             printf '@mono:registry=https://gitlab.com/api/v4/groups/%s/-/packages/npm/\n' "$GITLAB_PACKAGE_GROUP_ID"
             printf '//gitlab.com/api/v4/groups/%s/-/packages/npm/:_authToken=%s\n' "$GITLAB_PACKAGE_GROUP_ID" "$GITLAB_NPM_TOKEN"
+            # The lockfile resolves @mono/auth tarballs from its project registry.
+            printf '//gitlab.com/api/v4/projects/89199850/packages/npm/:_authToken=%s\n' "$GITLAB_NPM_TOKEN"
             printf '//gitlab.com/api/v4/projects/%s/packages/npm/:_authToken=%s\n' "$GITLAB_PACKAGE_PROJECT_ID" "$GITLAB_NPM_TOKEN"
           } > "$HOME/.npmrc"
       - run: pnpm install --frozen-lockfile
