@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+.npmrc
+.superpowers
+*.tsbuildinfo
+.DS_Store
