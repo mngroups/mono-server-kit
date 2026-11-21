@@ -8,6 +8,7 @@ import { type AuthOptions, validateAuthOptions } from "./config.js";
 import { createOidcClient } from "./oidc-client.js";
 import { registerCommonRoutes } from "./routes-common.js";
 import { registerCredentialsRoutes } from "./routes-credentials.js";
+import { registerSsoRoutes } from "./routes-sso.js";
 import type { AuthUser } from "./types.js";
 import { createVerifier } from "./verifier.js";
 
@@ -95,8 +96,9 @@ export const auth = fp<AuthOptions>(
           }
         }
       );
-      registerCommonRoutes(scope, oidc);
+      registerCommonRoutes(scope, oidc, opts);
       if (opts.mode === "credentials") registerCredentialsRoutes(scope, oidc);
+      else registerSsoRoutes(scope, oidc, opts);
     });
   },
   {

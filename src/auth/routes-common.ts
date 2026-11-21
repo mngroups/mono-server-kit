@@ -2,11 +2,16 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { envelopeSchema } from "../plugins/envelope.js";
+import type { AuthOptions } from "./config.js";
 import type { OidcClient } from "./oidc-client.js";
 import { tokenSetSchema } from "./schemas.js";
 
 /** refresh, logout and check: the same in both modes. */
-export function registerCommonRoutes(app: FastifyInstance, oidc: OidcClient): void {
+export function registerCommonRoutes(
+  app: FastifyInstance,
+  oidc: OidcClient,
+  opts: AuthOptions
+): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
 
   r.post(
@@ -32,7 +37,12 @@ export function registerCommonRoutes(app: FastifyInstance, oidc: OidcClient): vo
     async (request, reply) => {
       const refreshToken = request.body?.refresh_token;
       if (refreshToken) await oidc.revoke(refreshToken);
-      reply.ok(null);
+      if (opts.mode === "credentials") return reply.ok(null);
+      // sso: the FE sends the user here to end the central session (global logout).
+      const endSessionUrl = await oidc
+        .endSessionUrl({ postLogoutRedirectUri: opts.postLogoutRedirectUri })
+        .catch(() => null);
+      reply.ok({ end_session_url: endSessionUrl });
     }
   );
 
