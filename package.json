@@ -1,0 +1,70 @@
+{
+  "name": "@mono/server-kit",
+  "version": "0.1.0",
+  "description": "Shared Fastify plugins for Monexa backends: response envelope, error mapping, request id, OIDC auth (credentials/sso), RBAC, presign, health.",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./dev": {
+      "types": "./dist/dev/index.d.ts",
+      "import": "./dist/dev/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:staged": "lint-staged",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepack": "pnpm build",
+    "prepare": "husky",
+    "release": "release-it",
+    "release:rc": "release-it --preRelease=rc"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,json,jsonc,md}": "biome check --write --no-errors-on-unmatched"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@mono/auth": "link:../mono-auth",
+    "@release-it/conventional-changelog": "8.0.1",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^4.1.12",
+    "fastify": "^5.12.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "release-it": "17.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12",
+    "zod": "^4.6.7"
+  },
+  "dependencies": {
+    "fastify-plugin": "^5.1.0"
+  },
+  "peerDependencies": {
+    "@mono/auth": "^0.2.0",
+    "fastify": "^5.0.0",
+    "zod": "^4.0.0"
+  }
+}
