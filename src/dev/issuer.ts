@@ -1,7 +1,15 @@
 import { createHash, randomBytes, randomUUID, type webcrypto } from "node:crypto";
 import formbody from "@fastify/formbody";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
-import { exportJWK, generateKeyPair, type JWK, type JWTPayload, SignJWT } from "jose";
+import {
+  createLocalJWKSet,
+  exportJWK,
+  generateKeyPair,
+  type JWK,
+  type JWTPayload,
+  jwtVerify,
+  SignJWT,
+} from "jose";
 
 export type DevUser = {
   username: string;
@@ -9,9 +17,21 @@ export type DevUser = {
   sub: string;
   /** Permissions per client id: what lands in that client's token `permissions` claim. */
   permissions: Record<string, string[]>;
-  /** Adds `org_id` / `org_name` claims to this user's tokens. */
+  /** Single org (0.2): adds `org_id` / `org_name` claims. Same as `orgs: [org]`. */
   org?: { id: string; name: string };
+  /**
+   * Orgs the user belongs to; the first is the default. Per-org `permissions` (by
+   * client id) override the user-level ones. An empty list refuses with `no_app_access`.
+   */
+  orgs?: DevOrg[];
+  /** Refuses the password grant with `password_change_required` after the password checks out. */
+  mustChangePassword?: boolean;
 };
+
+export type DevOrg = { id: string; name: string; permissions?: Record<string, string[]> };
+
+/** Grant type of monexa-auth's org switch (params `refresh_token`, `org_id`). */
+export const ORG_SWITCH_GRANT = "urn:monexa:params:oauth:grant-type:org-switch";
 
 export type DevClient = { clientId: string; clientSecret: string; redirectUris: string[] };
 
@@ -33,11 +53,13 @@ export type DevIssuer = {
 };
 
 type SigningKey = { kid: string; privateKey: webcrypto.CryptoKey; jwk: JWK };
-type Session = { sub: string; clientId: string; sid: string };
+type Session = { sub: string; clientId: string; sid: string; orgId?: string };
 type PendingCode = Session & { redirectUri: string; challenge: string };
 type TokenBody = Record<string, string | undefined>;
 
 const opaque = () => randomBytes(32).toString("base64url");
+const orgsOf = (user: DevUser): DevOrg[] | undefined =>
+  user.orgs ?? (user.org ? [user.org] : undefined);
 const now = () => Math.floor(Date.now() / 1000);
 
 async function newKey(): Promise<SigningKey> {
@@ -67,6 +89,17 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
   const refreshTokens = new Map<string, Session>();
   const codes = new Map<string, PendingCode>();
 
+  /** The `sub` of an access token this issuer signed, or undefined. */
+  async function verifiedSub(token: string): Promise<string | undefined> {
+    try {
+      const jwks = createLocalJWKSet({ keys: keys.map((k) => k.jwk) });
+      const { payload } = await jwtVerify(token, jwks, { issuer });
+      return payload.sub;
+    } catch {
+      return undefined;
+    }
+  }
+
   const sign = (claims: JWTPayload) =>
     new SignJWT({ iss: issuer, iat: now(), exp: now() + accessTtl, ...claims })
       .setProtectedHeader({ alg: "RS256", kid: current().kid, typ: "JWT" })
@@ -74,6 +107,7 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
 
   async function issueTokens(session: Session) {
     const user = opts.users.find((u) => u.sub === session.sub) as DevUser;
+    const org = orgsOf(user)?.find((o) => o.id === session.orgId);
     const refreshToken = opaque();
     refreshTokens.set(refreshToken, session);
     return {
@@ -81,8 +115,8 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
         sub: session.sub,
         aud: session.clientId,
         sid: session.sid,
-        permissions: user.permissions[session.clientId] ?? [],
-        ...(user.org ? { org_id: user.org.id, org_name: user.org.name } : {}),
+        permissions: (org?.permissions ?? user.permissions)[session.clientId] ?? [],
+        ...(org ? { org_id: org.id, org_name: org.name } : {}),
       }),
       refresh_token: refreshToken,
       token_type: "Bearer",
@@ -98,8 +132,18 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
     return opts.clients.find((c) => c.clientId === id && c.clientSecret === secret) ?? null;
   }
 
-  const oauthError = (reply: FastifyReply, status: number, error: string) =>
-    reply.code(status).send({ error });
+  const oauthError = (reply: FastifyReply, status: number, error: string, description?: string) =>
+    reply.code(status).send(description ? { error, error_description: description } : { error });
+
+  /** The org a token is for: the requested one, else the first; undefined = user has no orgs concept. */
+  function pickOrg(user: DevUser, requested?: string): { org?: DevOrg; refusal?: string } {
+    const orgs = orgsOf(user);
+    if (orgs === undefined) return {};
+    if (orgs.length === 0) return { refusal: "no_app_access" };
+    if (requested === undefined) return { org: orgs[0] };
+    const org = orgs.find((o) => o.id === requested);
+    return org ? { org } : { refusal: "org_not_eligible" };
+  }
 
   const app = Fastify({ logger: false });
   await app.register(formbody);
@@ -118,6 +162,15 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
 
   app.get("/jwks", async () => ({ keys: keys.map((k) => k.jwk) }));
 
+  // monexa-auth's orgs endpoint: the token user's orgs, envelope-shaped.
+  app.get("/api/me/orgs", async (request, reply) => {
+    const token = request.headers.authorization?.match(/^Bearer\s+(\S+)$/i)?.[1];
+    const sub = token ? await verifiedSub(token) : undefined;
+    const user = opts.users.find((u) => u.sub === sub);
+    if (!user) return reply.code(401).send({ error: "invalid_token" });
+    return { data: (orgsOf(user) ?? []).map(({ id, name }) => ({ id, name })) };
+  });
+
   app.get<{ Querystring: TokenBody }>("/authorize", async (request, reply) => {
     const q = request.query;
     const client = opts.clients.find((c) => c.clientId === q.client_id);
@@ -128,6 +181,7 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
     if (!user) return reply.code(400).send({ error: "invalid_request" });
     const code = opaque();
     codes.set(code, {
+      orgId: pickOrg(user).org?.id,
       sub: user.sub,
       clientId: client.clientId,
       sid: randomUUID(),
@@ -150,7 +204,17 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
         (u) => u.username === body.username && u.password === body.password
       );
       if (!user) return oauthError(reply, 400, "invalid_grant");
-      return issueTokens({ sub: user.sub, clientId: client.clientId, sid: randomUUID() });
+      if (user.mustChangePassword) {
+        return oauthError(reply, 400, "invalid_grant", "password_change_required");
+      }
+      const { org, refusal } = pickOrg(user, body.org_id);
+      if (refusal) return oauthError(reply, 400, "invalid_grant", refusal);
+      return issueTokens({
+        sub: user.sub,
+        clientId: client.clientId,
+        sid: randomUUID(),
+        orgId: org?.id,
+      });
     }
 
     if (body.grant_type === "refresh_token") {
@@ -176,7 +240,24 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
       ) {
         return oauthError(reply, 400, "invalid_grant");
       }
-      return issueTokens({ sub: pending.sub, clientId: pending.clientId, sid: pending.sid });
+      return issueTokens({
+        sub: pending.sub,
+        clientId: pending.clientId,
+        sid: pending.sid,
+        orgId: pending.orgId,
+      });
+    }
+
+    if (body.grant_type === ORG_SWITCH_GRANT) {
+      const session = refreshTokens.get(body.refresh_token ?? "");
+      if (!session || session.clientId !== client.clientId) {
+        return oauthError(reply, 400, "invalid_grant");
+      }
+      const user = opts.users.find((u) => u.sub === session.sub) as DevUser;
+      const { org, refusal } = pickOrg(user, body.org_id ?? "");
+      if (refusal) return oauthError(reply, 400, "invalid_grant", refusal);
+      refreshTokens.delete(body.refresh_token as string);
+      return issueTokens({ ...session, orgId: org?.id });
     }
 
     return oauthError(reply, 400, "unsupported_grant_type");

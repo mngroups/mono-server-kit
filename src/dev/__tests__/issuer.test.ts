@@ -413,4 +413,133 @@ describe("createDevIssuer", () => {
       process.env.NODE_ENV = previous;
     }
   });
+
+  describe("multi-org", () => {
+    const ORG_A = { id: "org-a", name: "Org A" };
+    const ORG_B = { id: "org-b", name: "Org B", permissions: { "app-a": ["b:view"] } };
+    const MULTI: DevUser[] = [
+      {
+        username: "multi",
+        password: "pw",
+        sub: "u-multi",
+        permissions: { "app-a": ["a:all"] },
+        orgs: [ORG_A, ORG_B],
+      },
+      { username: "none", password: "pw", sub: "u-none", permissions: {}, orgs: [] },
+      {
+        username: "fresh",
+        password: "pw",
+        sub: "u-fresh",
+        permissions: {},
+        orgs: [ORG_A],
+        mustChangePassword: true,
+      },
+      { username: "legacy", password: "pw", sub: "u-legacy", permissions: {}, org: ORG_A },
+    ];
+    const multiSetup = () => createDevIssuer({ issuer: ISSUER, users: MULTI, clients: [CLIENT] });
+    const login = (
+      app: Awaited<ReturnType<typeof multiSetup>>["app"],
+      username: string,
+      extra: Record<string, string> = {}
+    ) => token(app, { grant_type: "password", username, password: "pw", ...extra });
+    const SWITCH = "urn:monexa:params:oauth:grant-type:org-switch";
+
+    it("signs in to the requested org with its per-org permissions", async () => {
+      const handle = await multiSetup();
+      const res = await login(handle.app, "multi", { org_id: "org-b" });
+      const { payload } = await verify(handle as never, res.json().access_token);
+      expect(payload).toMatchObject({
+        org_id: "org-b",
+        org_name: "Org B",
+        permissions: ["b:view"],
+      });
+    });
+
+    it("defaults to the first org and the user-level permissions", async () => {
+      const handle = await multiSetup();
+      const { payload } = await verify(
+        handle as never,
+        (await login(handle.app, "multi")).json().access_token
+      );
+      expect(payload).toMatchObject({ org_id: "org-a", permissions: ["a:all"] });
+    });
+
+    it("refuses an org the user isn't in, an empty org list, and a forced password change", async () => {
+      const { app } = await multiSetup();
+      expect((await login(app, "multi", { org_id: "org-c" })).json()).toEqual({
+        error: "invalid_grant",
+        error_description: "org_not_eligible",
+      });
+      expect((await login(app, "none")).json()).toEqual({
+        error: "invalid_grant",
+        error_description: "no_app_access",
+      });
+      expect((await login(app, "fresh")).json()).toEqual({
+        error: "invalid_grant",
+        error_description: "password_change_required",
+      });
+    });
+
+    it("keeps the legacy single org field working", async () => {
+      const handle = await multiSetup();
+      const { payload } = await verify(
+        handle as never,
+        (await login(handle.app, "legacy")).json().access_token
+      );
+      expect(payload).toMatchObject({ org_id: "org-a", org_name: "Org A" });
+    });
+
+    it("switches org with a refresh token and spends the old one", async () => {
+      const handle = await multiSetup();
+      const first = (await login(handle.app, "multi")).json();
+      const switched = await token(handle.app, {
+        grant_type: SWITCH,
+        refresh_token: first.refresh_token,
+        org_id: "org-b",
+      });
+      expect(switched.statusCode).toBe(200);
+      const { payload } = await verify(handle as never, switched.json().access_token);
+      expect(payload.org_id).toBe("org-b");
+      const reused = await token(handle.app, {
+        grant_type: "refresh_token",
+        refresh_token: first.refresh_token,
+      });
+      expect(reused.json()).toEqual({ error: "invalid_grant" });
+      const refused = await token(handle.app, {
+        grant_type: SWITCH,
+        refresh_token: switched.json().refresh_token,
+        org_id: "org-c",
+      });
+      expect(refused.json()).toEqual({
+        error: "invalid_grant",
+        error_description: "org_not_eligible",
+      });
+      const unknown = await token(handle.app, {
+        grant_type: SWITCH,
+        refresh_token: "nope",
+        org_id: "org-a",
+      });
+      expect(unknown.json()).toEqual({ error: "invalid_grant" });
+    });
+
+    it("lists the token user's orgs at /api/me/orgs", async () => {
+      const { app } = await multiSetup();
+      const { access_token } = (await login(app, "multi")).json();
+      const res = await app.inject({
+        url: "/api/me/orgs",
+        headers: { authorization: `Bearer ${access_token}` },
+      });
+      expect(res.json()).toEqual({
+        data: [
+          { id: "org-a", name: "Org A" },
+          { id: "org-b", name: "Org B" },
+        ],
+      });
+      expect((await app.inject({ url: "/api/me/orgs" })).statusCode).toBe(401);
+      expect(
+        (await app.inject({ url: "/api/me/orgs", headers: { authorization: "Bearer junk" } }))
+          .statusCode
+      ).toBe(401);
+    });
+  });
 });
