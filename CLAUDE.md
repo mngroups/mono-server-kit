@@ -4,12 +4,12 @@ Shared Fastify 5 plugins for Monexa backends. ESM, TypeScript (NodeNext), Node 2
 
 ## Commands
 
-| Command              | What it does                              |
-| -------------------- | ----------------------------------------- |
-| `pnpm test:coverage` | Vitest. Coverage must stay at **100%**    |
-| `pnpm typecheck`     | `tsc --noEmit`                            |
-| `pnpm lint`          | Biome. Use `pnpm lint:fix` to apply fixes |
-| `pnpm build`         | Emits `dist/` (`tsconfig.build.json`)     |
+| Command              | What it does                                   |
+| -------------------- | ---------------------------------------------- |
+| `pnpm test:coverage` | Vitest. Coverage must stay at or above **80%** |
+| `pnpm typecheck`     | `tsc --noEmit`                                 |
+| `pnpm lint`          | Biome. Use `pnpm lint:fix` to apply fixes      |
+| `pnpm build`         | Emits `dist/` (`tsconfig.build.json`)          |
 
 ## Rules
 

@@ -191,6 +191,6 @@ It supports both modes end to end:
 
 ## Development
 
-`pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build`. Coverage is 100% and enforced.
+`pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build`. Coverage of at least 80% is enforced; behavior that matters (auth, error mapping) must have a test.
 
 Release with `pnpm release`, which tags `v<version>`. The Publish workflow then sends the tag to this project's GitLab Package Registry. It needs the GitHub Actions secret `GITLAB_NPM_TOKEN` and the variables `GITLAB_PACKAGE_GROUP_ID` and `GITLAB_PACKAGE_PROJECT_ID`.

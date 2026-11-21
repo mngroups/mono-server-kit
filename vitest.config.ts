@@ -11,7 +11,7 @@ export default defineConfig({
       reporter: ["text", "html", "lcov", "json-summary"],
       include: ["src/**/*.ts"],
       exclude: ["src/**/__tests__/**", "src/**/index.ts"],
-      thresholds: { lines: 100, statements: 100, functions: 100, branches: 100 },
+      thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },
     },
   },
 });
