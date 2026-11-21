@@ -15,7 +15,7 @@ Shared Fastify 5 plugins for Monexa backends. ESM, TypeScript (NodeNext), Node 2
 
 - Responses always use the envelope `{ success, message, code, data, request_id, timestamp }`, with `code` equal to the HTTP status. Contract shapes come from `@mono/auth` and are never copied.
 - Status mapping: validation 422, bad token 401, permission 403, unknown route 404, central-service outage **503 (never 401)**, everything else 500.
-- User-facing copy is Indonesian and lives only in `src/messages.ts`.
+- User-facing copy is Indonesian and lives only in `src/messages.ts`; provider refusal reasons map to it in `src/auth/reasons.ts` (unknown reasons keep the generic copy).
 - Auth is secure by default. Only routes with `config: { public: true }` skip the token check.
 - Never log tokens, passwords or secrets. Extend `REDACT_PATHS` in `src/server-options.ts` when a new secret field appears.
 - No cross-request in-memory state, except the JWKS and discovery caches, so the plugins run unchanged on Vercel Functions.

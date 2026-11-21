@@ -21,29 +21,30 @@ Peers: `fastify ^5.5`, `fastify-type-provider-zod ^7` (one copy shared with your
 
 ## Options
 
-| Plugin / helper       | Option                       | Default              | Notes                                                                        |
-| --------------------- | ---------------------------- | -------------------- | ---------------------------------------------------------------------------- |
-| `createServerOptions` | `logLevel`                   | `"info"`             | Logger always redacts `REDACT_PATHS`                                         |
-| `auth`                | `mode`                       | required             | `"credentials"` or `"sso"`                                                   |
-|                       | `issuer`                     | required             | Absolute URL; discovery at `/.well-known/openid-configuration`               |
-|                       | `clientId`, `clientSecret`   | required             | Confidential client, `client_secret_basic`                                   |
-|                       | `jwksUri`                    | discovery `jwks_uri` | Resolved lazily on the first guarded request                                 |
-|                       | `redirectUris`               | –                    | sso only, required; allowlist for `redirect_uri`                             |
-|                       | `idpHint`                    | –                    | sso only; e.g. `"google"`                                                    |
-|                       | `idpHintParam`               | `"kc_idp_hint"`      | Authorize-URL parameter carrying `idpHint`                                   |
-|                       | `postLogoutRedirectUri`      | –                    | sso only; added to `end_session_url`                                         |
-|                       | `timeoutMs`                  | `10000`              | Per call to the central service; timeout → 503                               |
-|                       | `jwksCooldownMs`             | `30000`              | Min gap between JWKS refetches; an unknown `kid` inside it → 503 (retryable) |
-| `health`              | `checks`                     | `{}`                 | `{ name: () => Promise<unknown> }`                                           |
-|                       | `timeoutMs`                  | `2000`               | Per check; a slower check counts as `"fail"`                                 |
-| `createPresigner`     | `bucket`, `region`           | required             |                                                                              |
-|                       | `endpoint`, `forcePathStyle` | –                    | S3-compatible storage (MinIO)                                                |
-|                       | `credentials`                | AWS SDK chain        |                                                                              |
-|                       | `expiresInSeconds`           | `300`                |                                                                              |
-|                       | `keyPrefix`                  | `"uploads"`          | Keys are `<prefix>/<uuid>/<safe-name>`                                       |
-| `startServer`         | `port`                       | required             |                                                                              |
-|                       | `host`                       | `"0.0.0.0"`          |                                                                              |
-|                       | `graceMs`                    | `10000`              | Max time to finish in-flight requests on SIGTERM                             |
+| Plugin / helper       | Option                       | Default                       | Notes                                                                        |
+| --------------------- | ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `createServerOptions` | `logLevel`                   | `"info"`                      | Logger always redacts `REDACT_PATHS`                                         |
+| `auth`                | `mode`                       | required                      | `"credentials"` or `"sso"`                                                   |
+|                       | `issuer`                     | required                      | Absolute URL; discovery at `/.well-known/openid-configuration`               |
+|                       | `clientId`, `clientSecret`   | required                      | Confidential client, `client_secret_basic`                                   |
+|                       | `jwksUri`                    | discovery `jwks_uri`          | Resolved lazily on the first guarded request                                 |
+|                       | `redirectUris`               | –                             | sso only, required; allowlist for `redirect_uri`                             |
+|                       | `idpHint`                    | –                             | sso only; e.g. `"google"`                                                    |
+|                       | `idpHintParam`               | `"kc_idp_hint"`               | Authorize-URL parameter carrying `idpHint`                                   |
+|                       | `postLogoutRedirectUri`      | –                             | sso only; added to `end_session_url`                                         |
+|                       | `timeoutMs`                  | `10000`                       | Per call to the central service; timeout → 503                               |
+|                       | `orgsEndpoint`               | `<issuer origin>/api/me/orgs` | Provider orgs endpoint for `GET /v1/auth/orgs`                               |
+|                       | `jwksCooldownMs`             | `30000`                       | Min gap between JWKS refetches; an unknown `kid` inside it → 503 (retryable) |
+| `health`              | `checks`                     | `{}`                          | `{ name: () => Promise<unknown> }`                                           |
+|                       | `timeoutMs`                  | `2000`                        | Per check; a slower check counts as `"fail"`                                 |
+| `createPresigner`     | `bucket`, `region`           | required                      |                                                                              |
+|                       | `endpoint`, `forcePathStyle` | –                             | S3-compatible storage (MinIO)                                                |
+|                       | `credentials`                | AWS SDK chain                 |                                                                              |
+|                       | `expiresInSeconds`           | `300`                         |                                                                              |
+|                       | `keyPrefix`                  | `"uploads"`                   | Keys are `<prefix>/<uuid>/<safe-name>`                                       |
+| `startServer`         | `port`                       | required                      |                                                                              |
+|                       | `host`                       | `"0.0.0.0"`                   |                                                                              |
+|                       | `graceMs`                    | `10000`                       | Max time to finish in-flight requests on SIGTERM                             |
 
 ## Usage
 
@@ -113,14 +114,35 @@ Routes registered by mode:
 
 | Route                        | `credentials`                                              | `sso`                                                                   |
 | ---------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `POST /v1/auth/login`        | `{ username, password }` → tokens                          | 404                                                                     |
+| `POST /v1/auth/login`        | `{ username, password, org_id? }` → tokens                 | 404                                                                     |
 | `GET /v1/auth/authorize-url` | 404                                                        | `?redirect_uri` (must be allowlisted) → `{ url, state, code_verifier }` |
 | `POST /v1/auth/callback`     | 404                                                        | `{ code, code_verifier, redirect_uri }` → tokens                        |
 | `POST /v1/auth/refresh`      | `{ refresh_token }` → tokens                               | same                                                                    |
 | `POST /v1/auth/logout`       | optional `{ refresh_token }`, revoked best effort → `null` | same → `{ end_session_url }`                                            |
 | `GET /v1/auth/check`         | `{ user_id, permissions }` from the token                  | same                                                                    |
+| `POST /v1/auth/switch-org`   | `{ refresh_token, org_id }` → tokens for that org (public) | same                                                                    |
+| `GET /v1/auth/orgs`          | the caller's orgs `[{ id, name }]` (guarded)               | same                                                                    |
 
 Tokens are returned as `{ access_token, refresh_token, expires_in, refresh_expires_in }`.
+
+**Multi-org (monexa-auth).** A token is for one active org.
+- `request.user.orgId` / `orgName` come from the `org_id` / `org_name` claims.
+- `org_id` on login picks the org; without it the provider uses the last-used or first eligible org.
+- `switch-org` uses monexa-auth's grant `urn:monexa:params:oauth:grant-type:org-switch` and spends the old refresh token.
+- `orgs` proxies `GET <issuer origin>/api/me/orgs` with the caller's token. Override it with the `orgsEndpoint` option.
+- Provider outages answer 503; a rejected token answers 401.
+
+**Refusal reasons.** When the provider refuses a grant with `invalid_grant` and a known `error_description`, the 401 envelope carries an Indonesian message and `data: { reason }`, so the FE can react (e.g. link to the account page on `password_change_required`):
+
+| `data.reason`              | Message                           |
+| -------------------------- | --------------------------------- |
+| `invalid_credentials`      | `MESSAGES.invalidCredentials`     |
+| `no_app_access`            | `MESSAGES.noAppAccess`            |
+| `password_change_required` | `MESSAGES.passwordChangeRequired` |
+| `org_not_eligible`         | `MESSAGES.orgNotEligible`         |
+| `google_required`          | `MESSAGES.googleRequired`         |
+
+Any other description keeps the generic message with `data: null`.
 
 The central service must speak standard OIDC: discovery, the `password` grant (credentials mode), `authorization_code` + PKCE S256 (sso mode), `refresh_token`, RFC 7009 revocation and `end_session_endpoint`. The backend authenticates as a confidential client with `client_secret_basic`.
 
@@ -169,7 +191,12 @@ const issuer = await createDevIssuer({
       password: "admin123",
       sub: "u1",
       permissions: { "my-app": ["example:all"] },
-      org: { id: "org-1", name: "PT A" }, // optional: adds org_id / org_name claims
+      // optional: orgs (first = default; per-org permissions override the user-level ones)
+      orgs: [
+        { id: "org-1", name: "PT A" },
+        { id: "org-2", name: "PT B", permissions: { "my-app": ["example.item:view"] } },
+      ],
+      // mustChangePassword: true, // refuses login with password_change_required
     },
   ],
   clients: [
@@ -187,7 +214,8 @@ It supports both modes end to end:
 - the authorize step auto-approves (pass `login_hint=<username>` to pick a user);
 - refresh tokens rotate;
 - `signTestToken(claims)` mints tokens for tests;
-- `rotateKey()` exercises key rotation.
+- `rotateKey()` exercises key rotation;
+- multi-org like monexa-auth: `org_id` on the password grant, the org-switch grant, `GET /api/me/orgs`, and the refusal reasons (`org_not_eligible`, `no_app_access`, `password_change_required`). The single `org` field from 0.2 still works.
 
 ## Development
 
