@@ -65,6 +65,7 @@ export interface OidcClient {
     state: string;
     idpHint?: string;
     idpHintParam?: string;
+    orgHint?: string;
   }): Promise<string>;
   endSessionUrl(p: { postLogoutRedirectUri?: string }): Promise<string | null>;
 }
@@ -210,6 +211,7 @@ export function createOidcClient(opts: OidcClientOptions): OidcClient {
         state: p.state,
       }).toString();
       if (p.idpHint) target.searchParams.set(p.idpHintParam ?? "kc_idp_hint", p.idpHint);
+      if (p.orgHint) target.searchParams.set("org_hint", p.orgHint);
       return target.toString();
     },
 

@@ -20,6 +20,12 @@ describe("validateAuthOptions", () => {
     ).not.toThrow();
   });
 
+  it("rejects an org hint outside sso mode", () => {
+    expect(() => validateAuthOptions({ ...base, orgHint: "pt-maju" })).toThrow(
+      /orgHint requires mode "sso"/
+    );
+  });
+
   it("rejects an IdP hint outside sso mode", () => {
     expect(() => validateAuthOptions({ ...base, idpHint: "google" })).toThrow(
       /idpHint requires mode "sso"/

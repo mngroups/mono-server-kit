@@ -31,6 +31,7 @@ Peers: `fastify ^5.5`, `fastify-type-provider-zod ^7` (one copy shared with your
 |                       | `redirectUris`               | –                             | sso only, required; allowlist for `redirect_uri`                             |
 |                       | `idpHint`                    | –                             | sso only; e.g. `"google"`                                                    |
 |                       | `idpHintParam`               | `"kc_idp_hint"`               | Authorize-URL parameter carrying `idpHint`                                   |
+|                       | `orgHint`                    | –                             | sso only; the client org (id or slug), sent as `org_hint`                    |
 |                       | `postLogoutRedirectUri`      | –                             | sso only; added to `end_session_url`                                         |
 |                       | `timeoutMs`                  | `10000`                       | Per call to the central service; timeout → 503                               |
 |                       | `orgsEndpoint`               | `<issuer origin>/api/me/orgs` | Provider orgs endpoint for `GET /v1/auth/orgs`                               |
@@ -76,6 +77,7 @@ export async function buildApp() {
     clientSecret: env.AUTH_CLIENT_SECRET,
     redirectUris: env.AUTH_REDIRECT_URIS, // sso only
     idpHint: env.AUTH_IDP_HINT, // sso only, e.g. "google"
+    orgHint: env.AUTH_ORG_HINT, // sso only: one deployment = one client org
   });
   await app.register(health, { checks: { db: () => pool.query("select 1") } });
   // …feature routes
