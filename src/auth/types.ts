@@ -7,4 +7,8 @@ export type AuthUser = {
   /** This app's permissions (`permissions` claim, scoped by `aud`). */
   permissions: ReadonlySet<string>;
   claims: JWTPayload;
+  /** The token's `org_id`, when it is a string. */
+  orgId?: string;
+  /** The token's `org_name`, when it is a string. */
+  orgName?: string;
 };

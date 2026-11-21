@@ -9,6 +9,8 @@ export type DevUser = {
   sub: string;
   /** Permissions per client id: what lands in that client's token `permissions` claim. */
   permissions: Record<string, string[]>;
+  /** Adds `org_id` / `org_name` claims to this user's tokens. */
+  org?: { id: string; name: string };
 };
 
 export type DevClient = { clientId: string; clientSecret: string; redirectUris: string[] };
@@ -80,6 +82,7 @@ export async function createDevIssuer(opts: DevIssuerOptions): Promise<DevIssuer
         aud: session.clientId,
         sid: session.sid,
         permissions: user.permissions[session.clientId] ?? [],
+        ...(user.org ? { org_id: user.org.id, org_name: user.org.name } : {}),
       }),
       refresh_token: refreshToken,
       token_type: "Bearer",

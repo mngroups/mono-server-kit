@@ -74,6 +74,8 @@ export function createVerifier(opts: VerifierOptions): (token: string) => Promis
         id: payload.sub as string,
         permissions: toPermissions(payload.permissions),
         claims: payload,
+        orgId: typeof payload.org_id === "string" ? payload.org_id : undefined,
+        orgName: typeof payload.org_name === "string" ? payload.org_name : undefined,
       };
     } catch (error) {
       if (isJwksOutage(error) || (wasCoolingDown && error instanceof errors.JWKSNoMatchingKey)) {

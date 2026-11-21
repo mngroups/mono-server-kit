@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { PresignResponse } from "@mono/auth";
 import { AppError } from "./errors.js";
 import { MESSAGES } from "./messages.js";
@@ -18,6 +19,25 @@ export type PresignerOptions = {
   /** Default "uploads". */
   keyPrefix?: string;
 };
+
+export type DownloadRequest = {
+  key: string;
+  filename: string;
+  expiresInSeconds?: number;
+};
+
+export type ObjectStat = { size: number; contentType: string };
+
+/** Drops characters that could break out of the quoted Content-Disposition filename. */
+function dispositionName(filename: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control characters is the point
+  return filename.replace(/["\\\x00-\x1f\x7f]/g, "");
+}
+
+function isNotFound(error: unknown): boolean {
+  const e = error as { name?: string; $metadata?: { httpStatusCode?: number } } | null;
+  return e?.name === "NotFound" || e?.$metadata?.httpStatusCode === 404;
+}
 
 export type PresignRequest = {
   filename: string;
@@ -68,6 +88,34 @@ export function createPresigner(opts: PresignerOptions) {
         Expires: expires,
       });
       return { upload_uuid: uploadUuid, s3_key: key, presign_url: url, fields };
+    },
+
+    async presignDownload(p: DownloadRequest): Promise<{ url: string; expires_in: number }> {
+      const expiresIn = p.expiresInSeconds ?? expires;
+      const url = await getSignedUrl(
+        s3,
+        new GetObjectCommand({
+          Bucket: opts.bucket,
+          Key: p.key,
+          ResponseContentDisposition: `attachment; filename="${dispositionName(p.filename)}"`,
+        }),
+        { expiresIn }
+      );
+      return { url, expires_in: expiresIn };
+    },
+
+    /** Size and content type of a stored object, or null when it does not exist. */
+    async stat(key: string): Promise<ObjectStat | null> {
+      try {
+        const head = await s3.send(new HeadObjectCommand({ Bucket: opts.bucket, Key: key }));
+        return {
+          size: head.ContentLength ?? 0,
+          contentType: head.ContentType ?? "application/octet-stream",
+        };
+      } catch (error) {
+        if (isNotFound(error)) return null;
+        throw error;
+      }
     },
   };
 }

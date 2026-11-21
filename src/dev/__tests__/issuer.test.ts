@@ -16,6 +16,13 @@ const USERS: DevUser[] = [
     permissions: { "app-a": ["example:all"], "app-b": ["other:view"] },
   },
   { username: "viewer", password: "viewer123", sub: "user-2", permissions: {} },
+  {
+    username: "member",
+    password: "member123",
+    sub: "user-3",
+    permissions: {},
+    org: { id: "org-1", name: "PT A" },
+  },
 ];
 const basic = (id: string, secret: string) =>
   `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
@@ -114,6 +121,23 @@ describe("createDevIssuer", () => {
       await token(handle.app, { grant_type: "password", username: "viewer", password: "viewer123" })
     ).json();
     expect((await verify(handle, body.access_token)).payload.permissions).toEqual([]);
+  });
+
+  it("adds org_id and org_name claims for a user with an org, and none otherwise", async () => {
+    const handle = await setup();
+    const member = (
+      await token(handle.app, { grant_type: "password", username: "member", password: "member123" })
+    ).json();
+    expect((await verify(handle, member.access_token)).payload).toMatchObject({
+      org_id: "org-1",
+      org_name: "PT A",
+    });
+    const viewer = (
+      await token(handle.app, { grant_type: "password", username: "viewer", password: "viewer123" })
+    ).json();
+    const { payload } = await verify(handle, viewer.access_token);
+    expect(payload).not.toHaveProperty("org_id");
+    expect(payload).not.toHaveProperty("org_name");
   });
 
   it("rejects a wrong password with invalid_grant", async () => {
