@@ -61,7 +61,9 @@
     "zod": "^4.6.7"
   },
   "dependencies": {
-    "fastify-plugin": "^5.1.0"
+    "@fastify/formbody": "^9.0.2",
+    "fastify-plugin": "^5.1.0",
+    "jose": "^6.2.18"
   },
   "peerDependencies": {
     "@mono/auth": "^0.2.0",
