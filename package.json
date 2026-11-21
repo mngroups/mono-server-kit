@@ -1,6 +1,6 @@
 {
   "name": "@mono/server-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared Fastify plugins for Monexa backends: response envelope, error mapping, request id, OIDC auth (credentials/sso), RBAC, presign, health.",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
