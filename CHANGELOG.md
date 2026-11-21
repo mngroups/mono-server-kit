@@ -1,5 +1,12 @@
 
 
+## [0.4.0](///compare/v0.3.1...v0.4.0) (2026-11-21)
+
+
+### Added
+
+* send org_hint on the authorize URL ([#5](undefined/undefined/undefined/issues/5)) 3a0eef6
+
 ## [0.3.1](///compare/v0.3.0...v0.3.1) (2026-11-21)
 
 
