@@ -8,4 +8,6 @@ export const MESSAGES = {
   internal: "Terjadi kesalahan pada server",
   authUnavailable: "Layanan autentikasi sedang tidak tersedia",
   notReady: "Layanan belum siap",
+  fileTooLarge: "Ukuran file melebihi batas",
+  fileTypeNotAllowed: "Tipe file tidak diizinkan",
 } as const;
