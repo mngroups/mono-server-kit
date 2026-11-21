@@ -7,6 +7,12 @@ import {
 import { AppError } from "../errors.js";
 import { MESSAGES } from "../messages.js";
 
+function clientMessage(status: number): string {
+  if (status === 400 || status === 415) return MESSAGES.validation;
+  if (status === 413) return MESSAGES.payloadTooLarge;
+  return MESSAGES.badRequest;
+}
+
 // #region handbook:error-mapping
 /**
  * Maps every thrown error onto the envelope: validation → 422 with issues,
@@ -37,7 +43,9 @@ export const errorHandler = fp(
       }
       const status = error.statusCode ?? 500;
       if (!isResponseSerializationError(error) && status >= 400 && status < 500) {
-        return reply.fail(status, error.message);
+        // Framework messages are English and technical; the FE shows `message` in toasts.
+        request.log.info({ err: error }, "client error");
+        return reply.fail(status, clientMessage(status));
       }
       request.log.error({ err: error });
       return reply.fail(500, MESSAGES.internal);

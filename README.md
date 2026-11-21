@@ -7,10 +7,10 @@ Shared Fastify plugins for Monexa backends. The kit holds the **mechanism**: the
 Private in GitLab Package Registry. Copy `.npmrc.example` to `.npmrc` and set `GITLAB_PACKAGE_GROUP_ID` and a `GITLAB_NPM_TOKEN` with `read_package_registry` access. Then:
 
 ```bash
-pnpm add @mono/server-kit @mono/auth fastify zod
+pnpm add @mono/server-kit @mono/auth fastify fastify-type-provider-zod zod
 ```
 
-Peers: `fastify ^5`, `zod ^4`, `@mono/auth ^0.2`.
+Peers: `fastify ^5.5`, `fastify-type-provider-zod ^7` (one copy shared with your app's compilers), `zod ^4.1.5`, `@mono/auth ^0.2`.
 
 ## Entry points
 
@@ -18,6 +18,32 @@ Peers: `fastify ^5`, `zod ^4`, `@mono/auth ^0.2`.
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `@mono/server-kit`     | `createServerOptions`, `requestId`, `envelope`, `envelopeSchema`, `errorHandler`, `AppError`, `MESSAGES`, `defineEnv`, `auth`, `validateAuthOptions`, `createPresigner`, `health`, `startServer` |
 | `@mono/server-kit/dev` | `createDevIssuer`: a stub OIDC provider for local dev and tests. It throws when `NODE_ENV=production`                                                                                            |
+
+## Options
+
+| Plugin / helper       | Option                       | Default              | Notes                                                                        |
+| --------------------- | ---------------------------- | -------------------- | ---------------------------------------------------------------------------- |
+| `createServerOptions` | `logLevel`                   | `"info"`             | Logger always redacts `REDACT_PATHS`                                         |
+| `auth`                | `mode`                       | required             | `"credentials"` or `"sso"`                                                   |
+|                       | `issuer`                     | required             | Absolute URL; discovery at `/.well-known/openid-configuration`               |
+|                       | `clientId`, `clientSecret`   | required             | Confidential client, `client_secret_basic`                                   |
+|                       | `jwksUri`                    | discovery `jwks_uri` | Resolved lazily on the first guarded request                                 |
+|                       | `redirectUris`               | –                    | sso only, required; allowlist for `redirect_uri`                             |
+|                       | `idpHint`                    | –                    | sso only; e.g. `"google"`                                                    |
+|                       | `idpHintParam`               | `"kc_idp_hint"`      | Authorize-URL parameter carrying `idpHint`                                   |
+|                       | `postLogoutRedirectUri`      | –                    | sso only; added to `end_session_url`                                         |
+|                       | `timeoutMs`                  | `10000`              | Per call to the central service; timeout → 503                               |
+|                       | `jwksCooldownMs`             | `30000`              | Min gap between JWKS refetches; an unknown `kid` inside it → 503 (retryable) |
+| `health`              | `checks`                     | `{}`                 | `{ name: () => Promise<unknown> }`                                           |
+|                       | `timeoutMs`                  | `2000`               | Per check; a slower check counts as `"fail"`                                 |
+| `createPresigner`     | `bucket`, `region`           | required             |                                                                              |
+|                       | `endpoint`, `forcePathStyle` | –                    | S3-compatible storage (MinIO)                                                |
+|                       | `credentials`                | AWS SDK chain        |                                                                              |
+|                       | `expiresInSeconds`           | `300`                |                                                                              |
+|                       | `keyPrefix`                  | `"uploads"`          | Keys are `<prefix>/<uuid>/<safe-name>`                                       |
+| `startServer`         | `port`                       | required             |                                                                              |
+|                       | `host`                       | `"0.0.0.0"`          |                                                                              |
+|                       | `graceMs`                    | `10000`              | Max time to finish in-flight requests on SIGTERM                             |
 
 ## Usage
 
@@ -60,7 +86,7 @@ export async function buildApp() {
 
 - Reply with `reply.ok(data, { code?, message? })` or `reply.fail(code, message)`. Every response is `{ success, message, code, data, request_id, timestamp }`.
 - Use `envelopeSchema(zodSchema)` as the route's response schema. Fastify then serializes it fast and rejects shape drift.
-- In a route that has a Zod response schema, **call** `reply.ok(...)` and don't `return` it. The type provider types the handler's return value as the response body.
+- In a route that has a Zod response schema, **call** `reply.ok(...)` and don't `return` it. The type provider types the handler's return value as the response body, so `return reply.ok(...)` is a TypeScript error. Routes without a response schema may return it.
 - Throw `new AppError(409, "…")` for expected failures. Its message reaches the client as-is, so write it in Indonesian.
 
 ### Error mapping
@@ -78,7 +104,7 @@ The FE treats 401 as "refresh, then log out" and never logs a user out on a 5xx.
 
 ### Auth
 
-**Secure by default.** Once `auth` is registered, every route requires `Authorization: Bearer <token>` unless it sets `config: { public: true }`. Tokens are verified locally against the issuer's JWKS, which is cached, refetched when an unknown `kid` appears, and checked with 30 s of clock tolerance. There is no network call per request.
+**Secure by default.** Once `auth` is registered, every route requires `Authorization: Bearer <token>` unless it sets `config: { public: true }`. Tokens are verified locally against the issuer's JWKS, which is cached, refetched when an unknown `kid` appears, and checked with 30 s of clock tolerance. There is no network call per request. A token whose `azp` is another client is rejected even when `aud` also lists this app, because its `permissions` belong to that client.
 
 - `request.user`: `{ id, permissions: ReadonlySet<string>, claims }`, taken from `sub` and the `permissions` claim. If the claim is missing, the user has no permissions.
 - `app.requirePermission("example.item:view", …)` is a preHandler with OR semantics. A granted `example:all` covers every `example.*` permission.

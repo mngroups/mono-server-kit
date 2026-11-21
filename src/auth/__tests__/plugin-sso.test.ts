@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { DevIssuer } from "../../dev/issuer.js";
+import { MESSAGES } from "../../messages.js";
 import { createPkce } from "../pkce.js";
 import { buildApp, REDIRECT, startIssuer } from "./helpers.js";
 
@@ -65,7 +66,9 @@ describe("auth plugin — sso mode", () => {
   });
 
   it("rejects a redirect_uri outside the allowlist on both routes with 422", async () => {
-    expect((await authorize("http://evil.test/cb")).statusCode).toBe(422);
+    const start = await authorize("http://evil.test/cb");
+    expect(start.statusCode).toBe(422);
+    expect(start.json().data.issues[0].message).toBe(MESSAGES.redirectNotAllowed);
     const res = await app.inject({
       method: "POST",
       url: "/v1/auth/callback",

@@ -116,4 +116,55 @@ describe("createVerifier", () => {
     );
     expect(error).toMatchObject({ code: 503, message: MESSAGES.authUnavailable });
   });
+
+  it("rejects a token issued to another client even when aud also lists this app", async () => {
+    await expectInvalid(
+      verify(
+        await issuer.signTestToken({
+          sub: "u",
+          aud: ["app-b", "app-a"],
+          azp: "app-b",
+          permissions: ["x:all"],
+        })
+      )
+    );
+    await expectInvalid(
+      verify(
+        await issuer.signTestToken({ sub: "u", aud: ["app-b", "app-a"], permissions: ["x:all"] })
+      )
+    );
+  });
+
+  it("accepts a multi-audience token whose authorized party is this app", async () => {
+    const user = await verify(
+      await issuer.signTestToken({ sub: "u", aud: ["app-a", "account"], azp: "app-a" })
+    );
+    expect(user.id).toBe("u");
+    expect(
+      (await verify(await issuer.signTestToken({ sub: "u", aud: "app-a", azp: "app-a" }))).id
+    ).toBe("u");
+  });
+
+  it("answers 503 (retryable) for a rotated key seen during the JWKS cooldown, 401 once cooled", async () => {
+    const own = await createDevIssuer({ users: [], clients: [CLIENT] });
+    await own.listen();
+    const cooled = createVerifier({
+      jwksUri: `${own.issuer()}/jwks`,
+      issuer: own.issuer(),
+      audience: "app-a",
+      jwksCooldownMs: 200,
+    });
+    await cooled(await own.signTestToken({ sub: "u", aud: "app-a" })); // primes the cache
+    await own.rotateKey();
+    const rotated = await own.signTestToken({ sub: "u", aud: "app-a" });
+    const during = await cooled(rotated).catch((e: unknown) => e);
+    expect(during).toMatchObject({ code: 503, message: MESSAGES.authUnavailable });
+    await new Promise((r) => setTimeout(r, 250));
+    expect((await cooled(rotated)).id).toBe("u");
+
+    await new Promise((r) => setTimeout(r, 250));
+    const foreign = await createDevIssuer({ issuer: own.issuer(), users: [], clients: [] });
+    await expectInvalid(cooled(await foreign.signTestToken({ sub: "u", aud: "app-a" })));
+    await own.app.close();
+  });
 });

@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, errors, jwtVerify } from "jose";
+import { createRemoteJWKSet, errors, type JWTPayload, jwtVerify } from "jose";
 import { AppError } from "../errors.js";
 import { MESSAGES } from "../messages.js";
 import type { AuthUser } from "./types.js";
@@ -24,6 +24,17 @@ function isJwksOutage(error: unknown): boolean {
   );
 }
 
+/**
+ * The `permissions` claim belongs to the client the token was issued to. A
+ * token for another client that merely lists this app in `aud` must not carry
+ * that client's permissions here: require `azp` to be this app, and require
+ * `azp` whenever `aud` names several audiences.
+ */
+function isIssuedTo(payload: JWTPayload, clientId: string): boolean {
+  if (payload.azp !== undefined) return payload.azp === clientId;
+  return !Array.isArray(payload.aud) || payload.aud.length === 1;
+}
+
 function toPermissions(claim: unknown): ReadonlySet<string> {
   if (!Array.isArray(claim)) return new Set();
   return new Set(claim.filter((p): p is string => typeof p === "string"));
@@ -41,6 +52,9 @@ export function createVerifier(opts: VerifierOptions): (token: string) => Promis
     cooldownDuration: opts.jwksCooldownMs ?? 30_000,
   });
   return async (token) => {
+    // jose won't refetch the key set inside the cooldown. An unknown `kid` then may be
+    // a freshly rotated key, so answer a retryable 503 rather than a logout-inducing 401.
+    const wasCoolingDown = jwks.coolingDown;
     try {
       const { payload } = await jwtVerify(token, jwks, {
         issuer: opts.issuer,
@@ -49,13 +63,22 @@ export function createVerifier(opts: VerifierOptions): (token: string) => Promis
         clockTolerance: 30,
         requiredClaims: ["sub", "exp"],
       });
+      if (!isIssuedTo(payload, opts.audience)) {
+        throw new errors.JWTClaimValidationFailed(
+          "token was issued to another client",
+          payload,
+          "azp"
+        );
+      }
       return {
         id: payload.sub as string,
         permissions: toPermissions(payload.permissions),
         claims: payload,
       };
     } catch (error) {
-      if (isJwksOutage(error)) throw new AppError(503, MESSAGES.authUnavailable, { cause: error });
+      if (isJwksOutage(error) || (wasCoolingDown && error instanceof errors.JWKSNoMatchingKey)) {
+        throw new AppError(503, MESSAGES.authUnavailable, { cause: error });
+      }
       throw new AppError(401, MESSAGES.invalidToken, { cause: error });
     }
   };

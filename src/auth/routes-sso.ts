@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { MESSAGES } from "../messages.js";
 import { envelopeSchema } from "../plugins/envelope.js";
 import type { AuthOptions } from "./config.js";
 import type { OidcClient } from "./oidc-client.js";
@@ -17,7 +18,7 @@ export function registerSsoRoutes(app: FastifyInstance, oidc: OidcClient, opts: 
   const allowed = new Set(opts.redirectUris);
   const redirectUri = z
     .string()
-    .refine((uri) => allowed.has(uri), { message: "redirect_uri tidak diizinkan" });
+    .refine((uri) => allowed.has(uri), { message: MESSAGES.redirectNotAllowed });
   const r = app.withTypeProvider<ZodTypeProvider>();
 
   r.get(

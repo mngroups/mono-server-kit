@@ -115,7 +115,34 @@ describe("errorHandler", () => {
       payload: "{bad",
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ success: false, code: 400 });
+    expect(res.json()).toMatchObject({ success: false, code: 400, message: MESSAGES.validation });
+  });
+
+  it("never sends Fastify's English messages: empty JSON body, bad media type, oversized body", async () => {
+    const app = Fastify({ ...createServerOptions({ logLevel: "silent" }), bodyLimit: 10 });
+    await app.register(envelope);
+    await app.register(errorHandler);
+    app.post("/x", (_req, reply) => reply.ok(null));
+    app.get("/teapot", () => {
+      throw Object.assign(new Error("I'm a teapot"), { statusCode: 418 });
+    });
+    const empty = await app.inject({
+      method: "POST",
+      url: "/x",
+      headers: { "content-type": "application/json" },
+    });
+    expect(empty.json()).toMatchObject({ code: 400, message: MESSAGES.validation });
+    const media = await app.inject({
+      method: "POST",
+      url: "/x",
+      headers: { "content-type": "application/xml" },
+      payload: "<a/>",
+    });
+    expect(media.json()).toMatchObject({ code: 415, message: MESSAGES.validation });
+    const big = await app.inject({ method: "POST", url: "/x", payload: { long: "x".repeat(50) } });
+    expect(big.json()).toMatchObject({ code: 413, message: MESSAGES.payloadTooLarge });
+    const other = await app.inject({ url: "/teapot" });
+    expect(other.json()).toMatchObject({ code: 418, message: MESSAGES.badRequest });
   });
 
   it("returns an envelope 404 for unknown routes", async () => {
