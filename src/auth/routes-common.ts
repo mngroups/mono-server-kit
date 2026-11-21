@@ -82,13 +82,23 @@ export function registerCommonRoutes(
     {
       schema: {
         response: {
-          200: envelopeSchema(z.object({ user_id: z.string(), permissions: z.array(z.string()) })),
+          200: envelopeSchema(
+            z.object({
+              user_id: z.string(),
+              permissions: z.array(z.string()),
+              org: z.object({ id: z.string(), name: z.string() }).nullable(),
+            })
+          ),
         },
       },
     },
     async (request, reply) => {
       const user = request.user as NonNullable<typeof request.user>;
-      reply.ok({ user_id: user.id, permissions: [...user.permissions] });
+      const org =
+        user.orgId !== undefined && user.orgName !== undefined
+          ? { id: user.orgId, name: user.orgName }
+          : null;
+      reply.ok({ user_id: user.id, permissions: [...user.permissions], org });
     }
   );
 }
