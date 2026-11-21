@@ -1,5 +1,12 @@
 
 
+## [0.3.0](///compare/v0.2.0...v0.3.0) (2026-11-21)
+
+
+### Added
+
+* org switching and grant refusal reasons (0.3.0) ([#3](undefined/undefined/undefined/issues/3)) a7f9c2b
+
 ## [0.2.0](///compare/v0.1.0...v0.2.0) (2026-11-21)
 
 ## 0.1.0 (2026-11-21)
