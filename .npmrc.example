@@ -1,0 +1,6 @@
+# Copy to .npmrc (git-ignored). Set GITLAB_PACKAGE_GROUP_ID and
+# GITLAB_NPM_TOKEN in your shell; the token needs read_package_registry access.
+@mono:registry=https://gitlab.com/api/v4/groups/${GITLAB_PACKAGE_GROUP_ID}/-/packages/npm/
+//gitlab.com/api/v4/groups/${GITLAB_PACKAGE_GROUP_ID}/-/packages/npm/:_authToken=${GITLAB_NPM_TOKEN}
+# @mono/auth tarballs resolve from its project registry (see pnpm-lock.yaml).
+//gitlab.com/api/v4/projects/89199850/packages/npm/:_authToken=${GITLAB_NPM_TOKEN}
